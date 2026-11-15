@@ -187,6 +187,8 @@
       .status-summary { grid-template-columns: 1fr; }
     }
   </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
   <main class="page" id="app">
@@ -241,6 +243,11 @@
         <div class="panel-head"><div><h2>Area dengan tiket melewati SLA</h2><div class="panel-note">Urutan menggunakan total MP, Low/Loss, dan Change/Add.</div></div></div>
         <div class="rank-list" id="overdueRank"></div>
       </article>
+    </section>
+
+    <section class="section panel" id="mapPanel">
+      <div class="panel-head"><div><h2>Peta area</h2><div class="panel-note">Warna = status SLA (hijau Tercapai, kuning Perlu Perhatian, merah Di Bawah Target, abu-abu belum ada data). Ukuran = jumlah tiket. Klik titik untuk rincian.</div></div></div>
+      <div id="areaMap" style="height:420px;border-radius:10px;z-index:0"></div>
     </section>
 
     <section class="section">
@@ -409,6 +416,43 @@
       </div>`).join('') || '<div class="hint">Belum ada data SLA untuk periode ini.</div>';
     }
 
+    // Koordinat pusat kota/kabupaten per area (nama harus sama dengan nama area di Excel)
+    const AREA_COORDS = {
+      'Bangkalan': [-7.04, 112.74], 'Banyuwangi': [-8.22, 114.37], 'Bukit Tinggi': [-0.31, 100.37],
+      'Ciamis': [-7.33, 108.35], 'Jombang': [-7.55, 112.23], 'Mojokerto': [-7.47, 112.43],
+      'Pandeglang': [-6.31, 106.10], 'Pekanbaru': [0.51, 101.45], 'Pematang Siantar': [2.96, 99.06],
+      'Rangkasbitung': [-6.36, 106.25], 'Samarinda': [-0.50, 117.15], 'Siak': [0.80, 102.05],
+      'Tasikmalaya': [-7.33, 108.22], 'Tebing Tinggi': [3.33, 99.16], 'Tuban': [-6.90, 112.05],
+      'Tulungagung': [-8.07, 111.90]
+    };
+
+    function renderMap(areas) {
+      if (typeof L === 'undefined') { el('mapPanel').style.display = 'none'; return; }
+      if (!state.map) {
+        state.map = L.map('areaMap', { scrollWheelZoom: false }).setView([-2.5, 117], 4);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, attribution: '&copy; OpenStreetMap' }).addTo(state.map);
+        state.mapLayer = L.layerGroup().addTo(state.map);
+      }
+      const css = getComputedStyle(document.documentElement);
+      const color = { good: css.getPropertyValue('--green'), warn: css.getPropertyValue('--amber'), bad: css.getPropertyValue('--red'), none: css.getPropertyValue('--muted') };
+      const openCount = {};
+      (state.data.daily.open_list || []).forEach(t => openCount[t.area] = (openCount[t.area] || 0) + 1);
+      state.mapLayer.clearLayers();
+      const points = [];
+      areas.forEach(a => {
+        const pos = AREA_COORDS[a.area];
+        if (!pos) return;
+        points.push(pos);
+        const c = color[statusClass(a.status)].trim() || '#888';
+        L.circleMarker(pos, { radius: 7 + Math.sqrt(a.total || 0) * 0.6, color: c, fillColor: c, fillOpacity: .55, weight: 2 })
+          .bindPopup(`<b>${safe(a.area)}</b><br>SLA berbobot: ${fmtPct(a.sla_weighted)}<br>Status: ${safe(a.status)}<br>Total tiket: ${fmtInt(a.total)}<br>Open/pending: ${fmtInt(openCount[a.area] || 0)}`)
+          .bindTooltip(safe(a.area))
+          .addTo(state.mapLayer);
+      });
+      state.map.invalidateSize();
+      if (points.length) state.map.fitBounds(points, { padding: [30, 30], maxZoom: 7 });
+    }
+
     function renderOpenTickets() {
       const selectedArea = el('areaFilter').value;
       const byArea = {};
@@ -544,6 +588,7 @@
       renderRanking(state.filteredAreas);
       renderBestRanking(state.filteredAreas);
       renderOpenTickets();
+      renderMap(state.filteredAreas);
       renderDailyTable();
       renderAreaTable();
     }
