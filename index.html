@@ -81,6 +81,9 @@
     }
     .grid { display: grid; gap: 16px; }
     .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .top5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    @media (max-width: 1100px) { .top5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .top5 { grid-template-columns: 1fr; } }
     .card, .panel {
       background: var(--panel);
       border: 1px solid rgba(219, 227, 238, .95);
@@ -240,8 +243,13 @@
       </article>
     </section>
 
+    <section class="section">
+      <h2 style="margin:0 0 10px">Top 5 area terbaik</h2>
+      <div class="grid top5" id="top5"></div>
+    </section>
+
     <section class="section panel">
-      <div class="panel-head"><div><h2>Top 5 area terbaik</h2><div class="panel-note">Diurutkan dari SLA akhir berbobot tertinggi; jika sama, tiket lebih banyak di atas. Mengikuti filter periode.</div></div></div>
+      <div class="panel-head"><div><h2>Peringkat semua area</h2><div class="panel-note">Diurutkan dari SLA akhir berbobot tertinggi; jika sama, tiket lebih banyak di atas. Mengikuti filter periode.</div></div></div>
       <div class="rank-list" id="bestRank"></div>
     </section>
 
@@ -385,7 +393,10 @@
 
     function renderBestRanking(areas) {
       const rows = areas.filter(a => Number.isFinite(a.sla_weighted))
-        .sort((a, b) => b.sla_weighted - a.sla_weighted || b.total - a.total).slice(0, 5);
+        .sort((a, b) => b.sla_weighted - a.sla_weighted || b.total - a.total);
+      el('top5').innerHTML = rows.slice(0, 5).map((a, i) => `<article class="card">
+        <div class="label">#${i + 1} ${i === 0 ? '👑 ' : ''}${safe(a.area)}</div><div class="value ${statusClass(a.status)}">${fmtPct(a.sla_weighted)}</div>
+        <div class="hint">${fmtInt(a.total)} tiket · ${safe(a.status)}</div></article>`).join('');
       el('bestRank').innerHTML = rows.map((a, i) => `<div class="rank-row">
         <span class="rank-num">${i + 1}</span><span class="rank-area" title="${safe(a.area)}">${i === 0 ? '👑 ' : ''}${safe(a.area)}</span>
         <span class="rank-bar"><span style="width:${a.sla_weighted * 100}%"></span></span><span class="rank-total">${fmtPct(a.sla_weighted)}</span>
