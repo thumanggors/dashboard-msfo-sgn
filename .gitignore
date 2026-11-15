@@ -1,0 +1,6 @@
+password.txt
+data.json
+*.xlsx
+*.xlsm
+__pycache__/
+*.zip

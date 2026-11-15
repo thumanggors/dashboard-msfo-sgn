@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Monitoring SLA MSFO</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #12233f;
+      --muted: #65728a;
+      --line: #dbe3ee;
+      --panel: #ffffff;
+      --soft: #f3f6fa;
+      --blue: #175cd3;
+      --blue-soft: #eaf1ff;
+      --teal: #0b7f75;
+      --green: #14804a;
+      --amber: #b25e09;
+      --red: #b42318;
+      --shadow: 0 12px 34px rgba(18, 35, 63, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #edf2f7;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+    }
+    button, select, input { font: inherit; }
+    .page { max-width: 1500px; margin: 0 auto; padding: 26px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-start;
+      padding: 22px 24px;
+      color: #fff;
+      background: linear-gradient(120deg, #102a56, #175cd3 64%, #0b7f75);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.2; }
+    .subtitle { margin: 0; color: #dce8ff; }
+    .live { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #6ce9a6; box-shadow: 0 0 0 5px rgba(108, 233, 166, .16); }
+    .meta-bar {
+      margin: 14px 0 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .chip {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: var(--muted);
+    }
+    .chip strong { color: var(--ink); font-weight: 700; }
+    .refresh {
+      margin-left: auto;
+      border: 1px solid #b7c5d8;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 9px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .refresh:hover { background: var(--soft); }
+    .alert {
+      display: none;
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fff3f0;
+      color: var(--red);
+      border: 1px solid #f7c9c4;
+    }
+    .grid { display: grid; gap: 16px; }
+    .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card, .panel {
+      background: var(--panel);
+      border: 1px solid rgba(219, 227, 238, .95);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    .card { padding: 17px 18px; min-height: 120px; }
+    .label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .value { margin: 9px 0 5px; font-size: 30px; font-weight: 800; letter-spacing: -.03em; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .value.bad { color: var(--red); }
+    .value.good { color: var(--green); }
+    .section { margin-top: 20px; }
+    .two { grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr); }
+    .panel { padding: 18px; min-width: 0; }
+    .panel-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+    h2 { margin: 0; font-size: 17px; }
+    .panel-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .progress-row { display: grid; grid-template-columns: 180px 1fr 64px; gap: 12px; align-items: center; margin: 13px 0; }
+    .progress-label { color: #32415c; }
+    .track { position: relative; height: 10px; border-radius: 999px; background: #e9eef5; overflow: hidden; }
+    .bar { height: 100%; border-radius: inherit; background: var(--blue); }
+    .target { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); }
+    .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+    .legend { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin-top: 12px; }
+    .legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; background: var(--blue); }
+    .legend .target-key::before { background: var(--red); width: 2px; }
+    .status-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .status-box { background: var(--soft); border-radius: 10px; padding: 14px; }
+    .status-box strong { display: block; font-size: 24px; margin-top: 7px; }
+    .status-box.good strong { color: var(--green); }
+    .status-box.warn strong { color: var(--amber); }
+    .status-box.bad strong { color: var(--red); }
+    .status-box.none strong { color: var(--muted); }
+    .trend-wrap { overflow: hidden; }
+    .trend-chart { width: 100%; height: 260px; display: block; }
+    .axis { stroke: #cfd8e6; stroke-width: 1; }
+    .gridline { stroke: #e6ebf2; stroke-width: 1; }
+    .line-open { fill: none; stroke: var(--amber); stroke-width: 3; }
+    .line-close { fill: none; stroke: var(--teal); stroke-width: 3; }
+    .point-open { fill: var(--amber); }
+    .point-close { fill: var(--teal); }
+    .svg-label { fill: #6d7890; font-size: 11px; }
+    .svg-value { fill: #23324e; font-size: 11px; font-weight: 700; }
+    .table-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-field { display: grid; gap: 5px; min-width: 190px; }
+    .filter-field span { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .filter-panel { margin-bottom: 20px; padding: 16px 18px; }
+    .filter-panel .panel-head { margin-bottom: 0; align-items: center; }
+    select, input {
+      border: 1px solid #c5d0df;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--ink);
+    }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1050px; }
+    th, td { padding: 10px 11px; border-bottom: 1px solid #e7edf4; text-align: right; white-space: nowrap; }
+    th { position: sticky; top: 0; z-index: 1; background: #edf3fb; color: #3c4c66; font-size: 12px; }
+    th:first-child, td:first-child { text-align: left; position: sticky; left: 0; }
+    th:first-child { z-index: 2; background: #e5edf8; }
+    td:first-child { background: #fff; font-weight: 700; }
+    tbody tr:hover td { background: #f7f9fc; }
+    .daily-table { min-width: 3500px; font-variant-numeric: tabular-nums; }
+    .monthly-table { min-width: 1100px; font-variant-numeric: tabular-nums; }
+    .daily-table th, .daily-table td { padding: 8px 9px; text-align: center; }
+    .monthly-table th, .monthly-table td { text-align: center; }
+    .daily-table th:first-child, .daily-table td:first-child { text-align: left; min-width: 150px; }
+    .monthly-table th:first-child, .monthly-table td:first-child { text-align: left; }
+    .daily-table .open-cell, .monthly-table .open-cell { color: var(--red); background: #fff3f1; }
+    .daily-table .close-cell, .monthly-table .close-cell { color: var(--green); background: #edf9f2; }
+    .daily-table .month-total, .monthly-table .month-total { background: #fff6d8; font-weight: 800; }
+    .daily-table tfoot td, .monthly-table tfoot td { background: #172237; color: #fff; font-weight: 800; }
+    .daily-table tfoot td:first-child, .monthly-table tfoot td:first-child { background: #172237; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge.good { color: var(--green); background: #e9f7ef; }
+    .badge.warn { color: var(--amber); background: #fff4e5; }
+    .badge.bad { color: var(--red); background: #ffefed; }
+    .badge.none { color: var(--muted); background: #eef2f6; }
+    .rank-list { display: grid; gap: 9px; }
+    .rank-row { display: grid; grid-template-columns: 28px minmax(90px, 150px) 1fr 54px; gap: 10px; align-items: center; }
+    .rank-num { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+    .rank-area { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-bar { height: 9px; background: #e8edf4; border-radius: 999px; overflow: hidden; }
+    .rank-bar span { display: block; height: 100%; background: var(--red); border-radius: inherit; }
+    .rank-total { text-align: right; font-weight: 700; }
+    .footer { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 14px 2px 0; }
+    .loading { opacity: .58; pointer-events: none; }
+    @media (max-width: 1100px) {
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .two { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .page { padding: 12px; }
+      .header { padding: 18px; flex-direction: column; }
+      h1 { font-size: 22px; }
+      .kpis { grid-template-columns: 1fr; }
+      .progress-row { grid-template-columns: 120px 1fr 55px; }
+      .refresh { margin-left: 0; }
+      .status-summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page" id="app">
+    <header class="header">
+      <div>
+        <h1>Dashboard Monitoring SLA MSFO</h1>
+        <p class="subtitle" id="scope">Memuat data Excel...</p>
+      </div>
+      <div class="live"><span class="dot"></span><span id="liveText">Menghubungkan sumber</span></div>
+    </header>
+
+    <div class="meta-bar">
+      <span class="chip">Excel disimpan: <strong id="fileModified">-</strong></span>
+      <span class="chip">Dihitung di Excel: <strong id="workbookCalculated">-</strong></span>
+      <span class="chip">Refresh otomatis: <strong>60 detik</strong></span>
+      <button class="refresh" id="refreshBtn" type="button">Perbarui sekarang</button>
+    </div>
+    <div class="alert" id="alert"></div>
+
+    <section class="panel filter-panel">
+      <div class="panel-head">
+        <div><h2>Filter dashboard</h2><div class="panel-note">Berlaku untuk seluruh KPI, chart, peringkat, dan tabel di bawah.</div></div>
+        <div class="table-tools">
+          <label class="filter-field"><span>Periode (bulan)</span><select id="periodFilter" aria-label="Pilih periode bulan"></select></label>
+          <label class="filter-field"><span>Area</span><select id="areaFilter" aria-label="Pilih area"></select></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid kpis" id="kpis"></section>
+
+    <section class="section grid two">
+      <article class="panel">
+        <div class="panel-head">
+          <div><h2>SLA per kategori</h2><div class="panel-note">Garis merah menunjukkan target SLA workbook.</div></div>
+        </div>
+        <div id="slaBars"></div>
+        <div class="legend"><span>SLA aktual</span><span class="target-key">Target</span></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div><h2>Status area</h2><div class="panel-note">Berdasarkan SLA akhir berbobot.</div></div></div>
+        <div class="status-summary" id="statusSummary"></div>
+      </article>
+    </section>
+
+    <section class="section grid two">
+      <article class="panel trend-wrap">
+        <div class="panel-head"><div><h2 id="trendTitle">Open dan close harian</h2><div class="panel-note">Mengikuti periode dan area yang dipilih.</div></div></div>
+        <div id="trendChart"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><div><h2>Area dengan tiket melewati SLA</h2><div class="panel-note">Urutan menggunakan total MP, Low/Loss, dan Change/Add.</div></div></div>
+        <div class="rank-list" id="overdueRank"></div>
+      </article>
+    </section>
+
+    <section class="section panel">
+      <div class="panel-head">
+        <div><h2>Tiket harian per bulan</h2><div class="panel-note">Semua bulan menampilkan ringkasan bulanan; pilih satu bulan untuk rincian per tanggal.</div></div>
+      </div>
+      <div class="table-wrap" id="dailyTable"></div>
+    </section>
+
+    <section class="section panel">
+      <div class="panel-head">
+        <div><h2>Rincian area</h2><div class="panel-note">Filter tabel tanpa mengubah workbook.</div></div>
+        <div class="table-tools">
+          <input type="search" id="areaSearch" placeholder="Cari area">
+          <select id="statusFilter">
+            <option value="">Semua status</option>
+            <option>Tercapai</option>
+            <option>Perlu Perhatian</option>
+            <option>Di Bawah Target</option>
+            <option value="-">Tanpa data</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th><th>Total tiket</th><th>Open</th><th>Close</th>
+              <th>Memenuhi SLA</th><th>Melewati SLA</th><th>% memenuhi</th>
+              <th>% SLA Low &amp; Loss Signal</th><th>% SLA Change &amp; Add Splitter</th><th>% SLA MP</th>
+              <th>SLA akhir</th><th>Status</th><th>Rata-rata MTTR</th>
+            </tr>
+          </thead>
+          <tbody id="areaRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="footer">Filter periode memakai tanggal close untuk tiket selesai dan tanggal open untuk tiket aktif. Dashboard membaca nilai yang terakhir disimpan oleh Excel dan tidak menulis kembali ke workbook.</p>
+  </main>
+
+  <script>
+    const state = { data: null, timer: null };
+    const el = id => document.getElementById(id);
+    const intFmt = new Intl.NumberFormat('id-ID');
+    const dateFmt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const dayFmt = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' });
+    const fmtInt = value => Number.isFinite(value) ? intFmt.format(value) : '-';
+    const fmtPct = value => Number.isFinite(value) ? `${(value * 100).toLocaleString('id-ID', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%` : '-';
+    const fmtDateTime = value => value ? dateFmt.format(new Date(value)) : '-';
+    const safe = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+
+    function statusClass(status) {
+      if (status === 'Tercapai') return 'good';
+      if (status === 'Perlu Perhatian') return 'warn';
+      if (status === 'Di Bawah Target') return 'bad';
+      return 'none';
+    }
+
+    function renderKpis(data) {
+      const m = data.metrics;
+      const target = data.settings.target_sla;
+      const cards = [
+        ['Total tiket', fmtInt(m.total_tickets), 'MP + Low/Loss + Change/Add'],
+        ['Tiket MP', fmtInt(m.tickets_mp), `${fmtPct(m.tickets_mp / m.total_tickets)} dari total`],
+        ['Tiket Low + Loss', fmtInt(m.tickets_low_loss), `${fmtPct(m.tickets_low_loss / m.total_tickets)} dari total`],
+        ['Tiket Change + Add', fmtInt(m.tickets_change_add), `${fmtPct(m.tickets_change_add / m.total_tickets)} dari total`],
+        ['SLA akhir berbobot', fmtPct(m.sla_weighted), `Target ${fmtPct(target)}`, Number.isFinite(m.sla_weighted) ? (m.sla_weighted >= target ? 'good' : 'bad') : ''],
+        ['Tiket open', fmtInt(m.open), 'Open, Pending, dan Progress'],
+        ['Tiket close', fmtInt(m.close), `${fmtPct(m.close / m.total_tickets)} dari total tiket`],
+        ['Melewati SLA', fmtInt(m.over_sla), `${fmtPct(m.over_sla / (m.within_sla + m.over_sla))} dari tiket terukur`]
+      ];
+      el('kpis').innerHTML = cards.map(([label, value, hint, cls = '']) => `
+        <article class="card"><div class="label">${safe(label)}</div><div class="value ${cls}">${safe(value)}</div><div class="hint">${safe(hint)}</div></article>
+      `).join('');
+    }
+
+    function renderSlaBars(data) {
+      const target = data.settings.target_sla ?? 0;
+      const rows = [
+        ['Low + Loss Signal', data.metrics.sla_low_loss],
+        ['Change + Add Splitter', data.metrics.sla_change_add],
+        ['MP', data.metrics.sla_mp],
+        ['SLA akhir berbobot', data.metrics.sla_weighted]
+      ];
+      el('slaBars').innerHTML = rows.map(([label, value]) => {
+        const width = Number.isFinite(value) ? Math.max(0, Math.min(100, value * 100)) : 0;
+        return `<div class="progress-row">
+          <div class="progress-label">${safe(label)}</div>
+          <div class="track"><div class="bar" style="width:${width}%"></div><div class="target" style="left:${Math.min(100, target * 100)}%"></div></div>
+          <div class="pct">${fmtPct(value)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderStatuses(areas) {
+      const counts = { 'Tercapai': 0, 'Perlu Perhatian': 0, 'Di Bawah Target': 0, '-': 0 };
+      areas.forEach(area => counts[area.status] !== undefined ? counts[area.status]++ : counts['-']++);
+      el('statusSummary').innerHTML = [
+        ['Tercapai', counts['Tercapai'], 'good'],
+        ['Perlu perhatian', counts['Perlu Perhatian'], 'warn'],
+        ['Di bawah target', counts['Di Bawah Target'], 'bad'],
+        ['Tanpa data', counts['-'], 'none']
+      ].map(([label, count, cls]) => `<div class="status-box ${cls}"><span class="label">${safe(label)}</span><strong>${count}</strong></div>`).join('');
+    }
+
+    function renderTrend(items) {
+      if (!items.length) { el('trendChart').textContent = 'Data tren tidak tersedia.'; return; }
+      const width = 760, height = 260, left = 46, right = 20, top = 24, bottom = 42;
+      const plotW = width - left - right, plotH = height - top - bottom;
+      const max = Math.max(1, ...items.flatMap(item => [item.open, item.close]));
+      const step = items.length > 1 ? plotW / (items.length - 1) : plotW;
+      const x = i => left + i * step;
+      const y = value => top + plotH - (value / max) * plotH;
+      const path = key => items.map((item, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(item[key]).toFixed(1)}`).join(' ');
+      const grid = [0, .25, .5, .75, 1].map(ratio => {
+        const yy = top + plotH - ratio * plotH;
+        return `<line class="gridline" x1="${left}" y1="${yy}" x2="${width-right}" y2="${yy}"/><text class="svg-label" x="${left-8}" y="${yy+4}" text-anchor="end">${Math.round(max*ratio)}</text>`;
+      }).join('');
+      const points = items.map((item, i) => `
+        <circle class="point-open" cx="${x(i)}" cy="${y(item.open)}" r="4"><title>Open: ${item.open}</title></circle>
+        <circle class="point-close" cx="${x(i)}" cy="${y(item.close)}" r="4"><title>Close: ${item.close}</title></circle>
+        ${(item.label || i === 0 || i === items.length - 1 || (i + 1) % 5 === 0) ? `<text class="svg-label" x="${x(i)}" y="${height-16}" text-anchor="middle">${safe(item.label ?? dayFmt.format(new Date(item.date)))}</text>` : ''}
+      `).join('');
+      el('trendChart').innerHTML = `<svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik tiket open dan close harian">
+        ${grid}<line class="axis" x1="${left}" y1="${top+plotH}" x2="${width-right}" y2="${top+plotH}"/>
+        <path class="line-open" d="${path('open')}"/><path class="line-close" d="${path('close')}"/>${points}
+      </svg><div class="legend"><span style="--blue:var(--amber)">Open</span><span style="--blue:var(--teal)">Close</span></div>`;
+    }
+
+    function renderRanking(areas) {
+      const rows = areas.map(area => ({ area: area.area, total: area.overdue?.total ?? area.over_sla ?? 0 }))
+        .filter(item => item.total > 0).sort((a, b) => b.total - a.total).slice(0, 8);
+      const max = Math.max(1, ...rows.map(row => row.total));
+      el('overdueRank').innerHTML = rows.map((row, i) => `<div class="rank-row">
+        <span class="rank-num">${i + 1}</span><span class="rank-area" title="${safe(row.area)}">${safe(row.area)}</span>
+        <span class="rank-bar"><span style="width:${(row.total / max) * 100}%"></span></span><span class="rank-total">${fmtInt(row.total)}</span>
+      </div>`).join('') || '<div class="hint">Tidak ada data tiket melewati SLA.</div>';
+    }
+
+    function blankSummary(days) {
+      return {
+        daily_open: Array(days).fill(0), daily_close: Array(days).fill(0), total: 0,
+        open_tickets: 0, close_tickets: 0, tickets_mp: 0, tickets_low_loss: 0,
+        tickets_change_add: 0, low_loss_within: 0, low_loss_over: 0,
+        change_add_within: 0, change_add_over: 0, mp_within: 0, mp_over: 0,
+        within_sla: 0, over_sla: 0, mttr_seconds: 0, mttr_count: 0
+      };
+    }
+
+    function addSummary(total, item) {
+      Object.keys(total).forEach(key => {
+        if (Array.isArray(total[key])) item[key].forEach((value, index) => total[key][index] += value);
+        else total[key] += item[key] ?? 0;
+      });
+      return total;
+    }
+
+    function areaSummary(area, raw, settings) {
+      const rate = (within, over) => within + over ? within / (within + over) : null;
+      const slaLowLoss = rate(raw.low_loss_within, raw.low_loss_over);
+      const slaChangeAdd = rate(raw.change_add_within, raw.change_add_over);
+      const slaMp = rate(raw.mp_within, raw.mp_over);
+      const weighted = [[slaLowLoss, settings.weight_low_loss], [slaChangeAdd, settings.weight_change_add], [slaMp, settings.weight_mp]]
+        .filter(([value, weight]) => Number.isFinite(value) && Number.isFinite(weight));
+      const weightTotal = weighted.reduce((sum, item) => sum + item[1], 0);
+      const slaWeighted = weightTotal ? weighted.reduce((sum, item) => sum + item[0] * item[1], 0) / weightTotal : null;
+      const target = settings.target_sla ?? 0;
+      const tolerance = settings.status_tolerance ?? .1;
+      const status = !Number.isFinite(slaWeighted) ? '-' : slaWeighted >= target ? 'Tercapai' : slaWeighted >= target - tolerance ? 'Perlu Perhatian' : 'Di Bawah Target';
+      const minutes = raw.mttr_count ? Math.round(raw.mttr_seconds / raw.mttr_count / 60) : null;
+      return {
+        area, total: raw.total, open: raw.open_tickets, close: raw.close_tickets,
+        tickets_mp: raw.tickets_mp, tickets_low_loss: raw.tickets_low_loss,
+        tickets_change_add: raw.tickets_change_add, within_sla: raw.within_sla,
+        over_sla: raw.over_sla, sla_rate: rate(raw.within_sla, raw.over_sla),
+        sla_low_loss: slaLowLoss, sla_change_add: slaChangeAdd, sla_mp: slaMp,
+        sla_weighted: slaWeighted, status,
+        mttr: minutes === null ? '-' : `${Math.floor(minutes / 1440)} HARI : ${String(Math.floor(minutes / 60) % 24).padStart(2, '0')} JAM : ${String(minutes % 60).padStart(2, '0')} MENIT`,
+        daily_open: raw.daily_open, daily_close: raw.daily_close
+      };
+    }
+
+    function renderGlobalFilters() {
+      const daily = state.data.daily;
+      const period = el('periodFilter');
+      const area = el('areaFilter');
+      const selectedPeriod = period.value;
+      const selectedArea = area.value;
+      period.innerHTML = '<option value="">Semua bulan</option>' + daily.months.map(item => `<option value="${safe(item.value)}">${safe(item.label)}</option>`).join('');
+      area.innerHTML = '<option value="">Semua area</option>' + daily.areas.map(name => `<option value="${safe(name)}">${safe(name)}</option>`).join('');
+      if (daily.months.some(item => item.value === selectedPeriod)) period.value = selectedPeriod;
+      if (daily.areas.includes(selectedArea)) area.value = selectedArea;
+      renderFilteredDashboard();
+    }
+
+    function renderFilteredDashboard() {
+      const data = state.data;
+      const selectedPeriod = el('periodFilter').value;
+      const months = selectedPeriod ? data.daily.months.filter(item => item.value === selectedPeriod) : data.daily.months;
+      if (!months.length) return;
+      const selectedArea = el('areaFilter').value;
+      const names = selectedArea ? [selectedArea] : data.daily.areas;
+      const maxDays = Math.max(...months.map(item => item.days));
+      const combined = blankSummary(maxDays);
+      state.filteredAreas = names.map(name => {
+        const raw = blankSummary(maxDays);
+        months.forEach(month => addSummary(raw, data.daily.values[month.value]?.[name] ?? blankSummary(month.days)));
+        addSummary(combined, raw);
+        return areaSummary(name, raw, data.settings);
+      });
+      const metrics = areaSummary(selectedArea || 'Semua area', combined, data.settings);
+      metrics.total_tickets = metrics.total;
+      el('scope').textContent = `Area: ${selectedArea || 'Semua area'} · Periode: ${selectedPeriod ? months[0].label : 'Semua bulan'}`;
+      el('trendTitle').textContent = selectedPeriod ? 'Open dan close harian' : 'Open dan close per bulan';
+      renderKpis({ metrics, settings: data.settings });
+      renderSlaBars({ metrics, settings: data.settings });
+      renderStatuses(state.filteredAreas);
+      renderTrend(selectedPeriod ? combined.daily_open.slice(0, months[0].days).map((open, index) => ({
+        date: `${months[0].value}-${String(index + 1).padStart(2, '0')}T00:00:00`, open, close: combined.daily_close[index]
+      })) : months.slice().reverse().map(month => {
+        const monthly = blankSummary(month.days);
+        names.forEach(name => addSummary(monthly, data.daily.values[month.value]?.[name] ?? blankSummary(month.days)));
+        return {
+          date: `${month.value}-01T00:00:00`, label: month.label,
+          open: monthly.daily_open.reduce((sum, value) => sum + value, 0),
+          close: monthly.daily_close.reduce((sum, value) => sum + value, 0)
+        };
+      }));
+      renderRanking(state.filteredAreas);
+      renderDailyTable();
+      renderAreaTable();
+    }
+
+    function renderAllMonthsTable(daily, areas) {
+      const months = daily.months.slice().reverse();
+      const monthTotals = months.map(() => ({ open: 0, close: 0 }));
+      let grandOpen = 0, grandClose = 0;
+      const rows = areas.map(name => {
+        let totalOpen = 0, totalClose = 0;
+        const cells = months.map((month, index) => {
+          const values = daily.values[month.value]?.[name] ?? blankSummary(month.days);
+          const open = values.daily_open.reduce((sum, value) => sum + value, 0);
+          const close = values.daily_close.reduce((sum, value) => sum + value, 0);
+          totalOpen += open; totalClose += close;
+          monthTotals[index].open += open; monthTotals[index].close += close;
+          return `<td class="open-cell">${fmtInt(open)}</td><td class="close-cell">${fmtInt(close)}</td>`;
+        }).join('');
+        grandOpen += totalOpen; grandClose += totalClose;
+        return `<tr><td>${safe(name)}</td><td class="open-cell">${fmtInt(totalOpen)}</td><td class="close-cell">${fmtInt(totalClose)}</td><td class="month-total">${fmtInt(totalOpen + totalClose)}</td>${cells}</tr>`;
+      }).join('');
+      el('dailyTable').innerHTML = `<table class="monthly-table" aria-label="Ringkasan tiket semua bulan">
+        <thead><tr><th rowspan="2">Area / Kota</th><th rowspan="2">Total Open</th><th rowspan="2">Total Close</th><th rowspan="2">Total Semua Bulan</th>${months.map(month => `<th colspan="2">${safe(month.label)}</th>`).join('')}</tr>
+        <tr>${months.map(() => '<th>Open</th><th>Close</th>').join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Total Semua Bulan</td><td>${fmtInt(grandOpen)}</td><td>${fmtInt(grandClose)}</td><td>${fmtInt(grandOpen + grandClose)}</td>${monthTotals.map(item => `<td>${fmtInt(item.open)}</td><td>${fmtInt(item.close)}</td>`).join('')}</tr></tfoot>
+      </table>`;
+    }
+
+    function renderDailyTable() {
+      const daily = state.data?.daily;
+      const selectedPeriod = el('periodFilter').value;
+      const month = daily?.months.find(item => item.value === selectedPeriod);
+      const selectedArea = el('areaFilter').value;
+      const areas = selectedArea ? [selectedArea] : daily.areas;
+      if (!selectedPeriod) {
+        renderAllMonthsTable(daily, areas);
+        return;
+      }
+      if (!month) {
+        el('dailyTable').innerHTML = '<div class="hint" style="padding:16px">Data tiket harian tidak tersedia.</div>';
+        return;
+      }
+      const days = Array.from({ length: month.days }, (_, index) => index + 1);
+      const blank = blankSummary(month.days);
+      const totals = { open: Array(month.days).fill(0), close: Array(month.days).fill(0) };
+      const rows = areas.map(name => {
+        const values = daily.values[month.value]?.[name] ?? blank;
+        values.daily_open.forEach((value, index) => totals.open[index] += value);
+        values.daily_close.forEach((value, index) => totals.close[index] += value);
+        const totalOpen = values.daily_open.reduce((sum, value) => sum + value, 0);
+        const totalClose = values.daily_close.reduce((sum, value) => sum + value, 0);
+        return `<tr><td>${safe(name)}</td><td class="open-cell">${fmtInt(totalOpen)}</td><td class="close-cell">${fmtInt(totalClose)}</td><td class="month-total">${fmtInt(totalOpen + totalClose)}</td>${days.map((_, index) => `<td class="open-cell">${fmtInt(values.daily_open[index])}</td><td class="close-cell">${fmtInt(values.daily_close[index])}</td>`).join('')}</tr>`;
+      }).join('');
+      const totalOpen = totals.open.reduce((sum, value) => sum + value, 0);
+      const totalClose = totals.close.reduce((sum, value) => sum + value, 0);
+      el('dailyTable').innerHTML = `<table class="daily-table" aria-label="Tiket harian ${safe(month.label)}">
+        <thead><tr><th rowspan="2">Area / Kota</th><th rowspan="2">Total Open</th><th rowspan="2">Total Close</th><th rowspan="2">Total ${safe(month.label)}</th>${days.map(day => `<th colspan="2">${day}</th>`).join('')}</tr>
+        <tr>${days.map(() => '<th>Open</th><th>Close</th>').join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Total ${safe(month.label)}</td><td>${fmtInt(totalOpen)}</td><td>${fmtInt(totalClose)}</td><td>${fmtInt(totalOpen + totalClose)}</td>${days.map((_, index) => `<td>${fmtInt(totals.open[index])}</td><td>${fmtInt(totals.close[index])}</td>`).join('')}</tr></tfoot>
+      </table>`;
+    }
+
+    function renderAreaTable() {
+      if (!state.filteredAreas) return;
+      const query = el('areaSearch').value.trim().toLocaleLowerCase('id-ID');
+      const status = el('statusFilter').value;
+      const areas = state.filteredAreas.filter(area => (!query || area.area.toLocaleLowerCase('id-ID').includes(query)) && (!status || String(area.status ?? '-') === status));
+      el('areaRows').innerHTML = areas.map(area => `<tr>
+        <td>${safe(area.area)}</td><td>${fmtInt(area.total)}</td><td>${fmtInt(area.open)}</td><td>${fmtInt(area.close)}</td>
+        <td>${fmtInt(area.within_sla)}</td><td>${fmtInt(area.over_sla)}</td><td>${fmtPct(area.sla_rate)}</td>
+        <td>${fmtPct(area.sla_low_loss)}</td><td>${fmtPct(area.sla_change_add)}</td><td>${fmtPct(area.sla_mp)}</td>
+        <td>${fmtPct(area.sla_weighted)}</td><td><span class="badge ${statusClass(area.status)}">${safe(area.status ?? '-')}</span></td><td>${safe(area.mttr ?? '-')}</td>
+      </tr>`).join('') || '<tr><td colspan="13" style="text-align:center;color:#65728a">Tidak ada area yang sesuai filter.</td></tr>';
+    }
+
+    function render(data) {
+      state.data = data;
+      el('fileModified').textContent = fmtDateTime(data.meta.file_modified);
+      el('workbookCalculated').textContent = fmtDateTime(data.meta.workbook_calculated);
+      el('liveText').textContent = data.meta.stale ? 'Menampilkan data terakhir' : 'Terhubung ke Excel';
+      const alert = el('alert');
+      if (data.meta.stale || data.meta.warning) {
+        alert.style.display = 'block';
+        alert.textContent = `File sedang tidak dapat dibaca. Data terakhir tetap ditampilkan. ${data.meta.warning ?? ''}`;
+      } else {
+        alert.style.display = 'none';
+        alert.textContent = '';
+      }
+      renderGlobalFilters();
+    }
+
+    // Versi GitHub Pages: data.enc.json terenkripsi AES-GCM, didekripsi di browser dengan password.
+    function askPassword(retry) {
+      return new Promise(resolve => {
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;inset:0;z-index:99;background:#0b1220;display:flex;align-items:center;justify-content:center';
+        box.innerHTML = `<form style="background:#fff;padding:28px;border-radius:12px;display:grid;gap:12px;width:min(320px,90vw);font-family:inherit">
+          <b>Dashboard MSFO SLA</b>
+          <input type="password" placeholder="Password" autofocus style="padding:10px;font-size:16px">
+          <span style="color:#c00;font-size:13px">${retry ? 'Password salah.' : ''}</span>
+          <button style="padding:10px;font-size:16px">Masuk</button></form>`;
+        box.querySelector('form').onsubmit = e => { e.preventDefault(); const v = box.querySelector('input').value; box.remove(); resolve(v); };
+        document.body.appendChild(box);
+      });
+    }
+
+    async function loadEncrypted() {
+      const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+      const enc = await (await fetch(`data.enc.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+      for (let retry = false; ; retry = true) {
+        let password = sessionStorage.getItem('pw');
+        if (!password || retry) password = await askPassword(retry);
+        try {
+          const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+          const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(enc.salt), iterations: 200000, hash: 'SHA-256' },
+            base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+          const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(enc.iv) }, key, b64(enc.data));
+          sessionStorage.setItem('pw', password);
+          return JSON.parse(new TextDecoder().decode(plain));
+        } catch { sessionStorage.removeItem('pw'); }
+      }
+    }
+
+    async function loadData() {
+      const app = el('app');
+      app.classList.add('loading');
+      try {
+        if (location.hostname.endsWith('github.io')) return render(await loadEncrypted());
+        const response = await fetch(`/api/dashboard?t=${Date.now()}`, { cache: 'no-store' });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+        render(body);
+      } catch (error) {
+        const alert = el('alert');
+        alert.style.display = 'block';
+        alert.textContent = `Dashboard tidak dapat membaca Excel: ${error.message}`;
+        el('liveText').textContent = 'Sumber tidak tersedia';
+      } finally {
+        app.classList.remove('loading');
+      }
+    }
+
+    el('refreshBtn').addEventListener('click', loadData);
+    el('areaSearch').addEventListener('input', renderAreaTable);
+    el('statusFilter').addEventListener('change', renderAreaTable);
+    el('periodFilter').addEventListener('change', renderFilteredDashboard);
+    el('areaFilter').addEventListener('change', renderFilteredDashboard);
+    loadData();
+    state.timer = setInterval(loadData, 60000);
+  </script>
+</body>
+</html>
