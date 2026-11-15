@@ -241,6 +241,11 @@
     </section>
 
     <section class="section panel">
+      <div class="panel-head"><div><h2>Peringkat area terbaik</h2><div class="panel-note">Diurutkan dari SLA akhir berbobot tertinggi; jika sama, tiket lebih banyak di atas. Mengikuti filter periode.</div></div></div>
+      <div class="rank-list" id="bestRank"></div>
+    </section>
+
+    <section class="section panel">
       <div class="panel-head">
         <div><h2>Tiket harian per bulan</h2><div class="panel-note">Semua bulan menampilkan ringkasan bulanan; pilih satu bulan untuk rincian per tanggal.</div></div>
       </div>
@@ -378,6 +383,15 @@
       </div>`).join('') || '<div class="hint">Tidak ada data tiket melewati SLA.</div>';
     }
 
+    function renderBestRanking(areas) {
+      const rows = areas.filter(a => Number.isFinite(a.sla_weighted))
+        .sort((a, b) => b.sla_weighted - a.sla_weighted || b.total - a.total);
+      el('bestRank').innerHTML = rows.map((a, i) => `<div class="rank-row">
+        <span class="rank-num">${i + 1}</span><span class="rank-area" title="${safe(a.area)}">${safe(a.area)}</span>
+        <span class="rank-bar"><span style="width:${a.sla_weighted * 100}%"></span></span><span class="rank-total">${fmtPct(a.sla_weighted)}</span>
+      </div>`).join('') || '<div class="hint">Belum ada data SLA untuk periode ini.</div>';
+    }
+
     function blankSummary(days) {
       return {
         daily_open: Array(days).fill(0), daily_close: Array(days).fill(0), total: 0,
@@ -468,6 +482,7 @@
         };
       }));
       renderRanking(state.filteredAreas);
+      renderBestRanking(state.filteredAreas);
       renderDailyTable();
       renderAreaTable();
     }
