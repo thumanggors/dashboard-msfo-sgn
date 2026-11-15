@@ -59,6 +59,7 @@ def choose_newest_source(candidates) -> Path | None:
 def build_daily_report(workbook, source: Path, area_names: list[str]) -> dict[str, object]:
     normalize = lambda value: str(value).upper().replace(" ", "")
     counts = {}
+    open_list = []
     with ZipFile(source) as archive:
         table_limits = {}
         for name in archive.namelist():
@@ -130,15 +131,25 @@ def build_daily_report(workbook, source: Path, area_names: list[str]) -> dict[st
                 is_closed = str(status).strip().upper() in {"DONE", "CLOSE"}
                 event = closed if is_closed else opened
                 rank_date = as_datetime(event) or datetime.min
+                is_fat = table_marker == "FATLOSS"
+                label = str(row[4] if row[4] not in (None, "") else row[12 if is_fat else 13] or "").strip()
+                info = {
+                    "id": str(ticket_id).strip(), "area": area, "status": label,
+                    "type": str(row[13]).strip() if is_fat else "MP",
+                    "detail": str(row[22] if is_fat else f"{row[12] or ''} · {row[25] or ''}").strip(" ·"),
+                    "opened": json_value(opened), "sla": str(row[7] or "").strip(),
+                } if opened and label.upper() not in {"DONE", "CLOSE", ""} else None
                 candidate = (
                     (is_closed, rank_date, order), area, opened, closed, is_closed,
                     str(row[7]).strip().upper(), row[13] if table_marker == "FATLOSS" else None,
-                    row[42] if table_marker == "MP" else None,
+                    row[42] if table_marker == "MP" else None, info,
                 )
                 key = str(ticket_id).strip().upper()
                 if key not in selected or candidate[0] > selected[key][0]:
                     selected[key] = candidate
-        for _, area, opened, closed, is_closed, sla, category, nro in selected.values():
+        for _, area, opened, closed, is_closed, sla, category, nro, info in selected.values():
+            if info and not is_closed:
+                open_list.append(info)
             add_event(area, opened, "daily_open")
             add_event(area, closed, "daily_close")
             period_event = as_datetime(closed if is_closed else opened) or as_datetime(opened)
@@ -179,7 +190,8 @@ def build_daily_report(workbook, source: Path, area_names: list[str]) -> dict[st
             area: counts[key].get(area, bucket(key, area))
             for area in ordered_areas
         }
-    return {"months": months, "areas": ordered_areas, "values": values}
+    open_list.sort(key=lambda item: item["opened"] or "")
+    return {"months": months, "areas": ordered_areas, "values": values, "open_list": open_list}
 
 
 def resolve_source() -> Path:

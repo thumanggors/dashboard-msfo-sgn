@@ -254,6 +254,11 @@
     </section>
 
     <section class="section panel">
+      <div class="panel-head"><div><h2>Tiket open / pending per area</h2><div class="panel-note">Tiket yang belum Done/Close, terlama di atas. Mengikuti filter area; tidak terpengaruh filter periode.</div></div></div>
+      <div id="openTickets"></div>
+    </section>
+
+    <section class="section panel">
       <div class="panel-head">
         <div><h2>Tiket harian per bulan</h2><div class="panel-note">Semua bulan menampilkan ringkasan bulanan; pilih satu bulan untuk rincian per tanggal.</div></div>
       </div>
@@ -403,6 +408,25 @@
       </div>`).join('') || '<div class="hint">Belum ada data SLA untuk periode ini.</div>';
     }
 
+    function renderOpenTickets() {
+      const selectedArea = el('areaFilter').value;
+      const byArea = {};
+      (state.data.daily.open_list || []).filter(t => !selectedArea || t.area === selectedArea)
+        .forEach(t => (byArea[t.area] ??= []).push(t));
+      const aging = iso => {
+        const min = Math.max(0, Math.floor((Date.now() - new Date(iso)) / 60000));
+        return `${Math.floor(min / 1440)}h ${Math.floor(min / 60) % 24}j`;
+      };
+      const slaBadge = s => s === 'MELEWATI SLA' ? '<span class="badge bad">Melewati SLA</span>'
+        : s === 'SLA TERPENUHI' ? '<span class="badge good">SLA terpenuhi</span>' : '<span class="badge none">Belum dinilai</span>';
+      const html = Object.entries(byArea).sort((a, b) => b[1].length - a[1].length).map(([area, list]) => `
+        <details style="margin-bottom:8px" open><summary style="cursor:pointer;font-weight:700;padding:6px 0">${safe(area)} <span class="badge warn">${list.length} tiket</span></summary>
+        <div class="table-wrap"><table><thead><tr><th>Tiket</th><th>Status</th><th>Jenis</th><th>Lokasi / Detail</th><th>Dibuka</th><th>Umur</th><th>SLA</th></tr></thead><tbody>
+        ${list.map(t => `<tr><td>${safe(t.id)}</td><td><span class="badge warn">${safe(t.status)}</span></td><td>${safe(t.type)}</td><td>${safe(t.detail)}</td><td>${fmtDateTime(t.opened)}</td><td>${aging(t.opened)}</td><td>${slaBadge(t.sla)}</td></tr>`).join('')}
+        </tbody></table></div></details>`).join('');
+      el('openTickets').innerHTML = html || '<div class="hint">Tidak ada tiket open/pending.</div>';
+    }
+
     function blankSummary(days) {
       return {
         daily_open: Array(days).fill(0), daily_close: Array(days).fill(0), total: 0,
@@ -494,6 +518,7 @@
       }));
       renderRanking(state.filteredAreas);
       renderBestRanking(state.filteredAreas);
+      renderOpenTickets();
       renderDailyTable();
       renderAreaTable();
     }
