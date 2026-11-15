@@ -254,7 +254,8 @@
     </section>
 
     <section class="section panel">
-      <div class="panel-head"><div><h2>Tiket open / pending per area</h2><div class="panel-note">Tiket yang belum Done/Close, terlama di atas. Mengikuti filter area; tidak terpengaruh filter periode.</div></div></div>
+      <div class="panel-head"><div><h2>Tiket open / pending per area</h2><div class="panel-note">Tiket yang belum Done/Close, terlama di atas. Mengikuti filter area; tidak terpengaruh filter periode.</div></div>
+        <button class="refresh" id="exportOpenBtn" type="button">Ekspor ke Excel (CSV)</button></div>
       <div id="openTickets"></div>
     </section>
 
@@ -413,6 +414,7 @@
       const byArea = {};
       (state.data.daily.open_list || []).filter(t => !selectedArea || t.area === selectedArea)
         .forEach(t => (byArea[t.area] ??= []).push(t));
+      state.openExport = Object.values(byArea).flat();
       const aging = iso => {
         const min = Math.max(0, Math.floor((Date.now() - new Date(iso)) / 60000));
         return `${Math.floor(min / 1440)}h ${Math.floor(min / 60) % 24}j`;
@@ -425,6 +427,29 @@
         ${list.map(t => `<tr><td>${safe(t.id)}</td><td><span class="badge warn">${safe(t.status)}</span></td><td>${safe(t.type)}</td><td>${safe(t.detail)}</td><td>${fmtDateTime(t.opened)}</td><td>${aging(t.opened)}</td><td>${slaBadge(t.sla)}</td></tr>`).join('')}
         </tbody></table></div></details>`).join('');
       el('openTickets').innerHTML = html || '<div class="hint">Tidak ada tiket open/pending.</div>';
+    }
+
+    function exportOpenTickets() {
+      const list = state.openExport || [];
+      if (!list.length) return alert('Tidak ada tiket open/pending untuk diekspor.');
+      const pad = n => String(n).padStart(2, '0');
+      const cell = v => { v = String(v ?? '').replace(/"/g, '""'); return `"${/^[=+\-@]/.test(v) ? "'" + v : v}"`; };
+      const rows = [['Area', 'Tiket', 'Status', 'Jenis', 'Lokasi / Detail', 'Dibuka', 'Umur (hari)', 'Status SLA'],
+        ...list.map(t => {
+          const d = new Date(t.opened);
+          return [t.area, t.id, t.status, t.type, t.detail,
+            `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+            ((Date.now() - d) / 864e5).toFixed(1).replace('.', ','), t.sla || 'Belum dinilai'];
+        })];
+      // BOM + "sep=;" agar Excel (locale Indonesia) langsung memisah kolom dengan benar
+      const csv = '﻿sep=;\r\n' + rows.map(r => r.map(cell).join(';')).join('\r\n');
+      const now = new Date();
+      const link = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })),
+        download: `tiket-open-pending-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.csv`
+      });
+      link.click();
+      URL.revokeObjectURL(link.href);
     }
 
     function blankSummary(days) {
@@ -664,6 +689,7 @@
     }
 
     el('refreshBtn').addEventListener('click', loadData);
+    el('exportOpenBtn').addEventListener('click', exportOpenTickets);
     el('areaSearch').addEventListener('input', renderAreaTable);
     el('statusFilter').addEventListener('change', renderAreaTable);
     el('periodFilter').addEventListener('change', renderFilteredDashboard);
