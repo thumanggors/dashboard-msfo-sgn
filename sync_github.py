@@ -50,6 +50,8 @@ def sync(last_mtime):
 
 
 if __name__ == "__main__":
+    if sys.stdout is None:  # dijalankan lewat pythonw (tanpa jendela): tulis log ke file
+        sys.stdout = open(server.BASE_DIR / "sync.log", "a", encoding="utf-8", buffering=1)
     last = None
     while True:
         try:
